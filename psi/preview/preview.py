@@ -12,7 +12,26 @@ quit_event = threading.Event()
 save_image_event = threading.Event()
 save_complete_event = threading.Event()
 image_ready = io.BytesIO()
+image_buffer = None
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+def preview2():
+    global image_buffer
+    logging.info("preview: thread is starting...")
+    stream = io.BytesIO()
+    with picamera.PiCamera() as camera:
+        camera.ISO = 50
+        for foo in camera.capture_continuous(stream, 'jpeg', use_video_port=True):
+            if save_image_event.is_set():
+                image_buffer = stream.getvalue()
+                save_complete_event.set()
+                save_image_event.clear
+            stream.seek(0)
+            stream.truncate()
+            if quit_event.is_set():
+                break
+    logging.info("preview: thread is terminated")
+
 
 def preview():
     global image_ready
@@ -48,6 +67,15 @@ def hello_world():
     #return render_template('home.html')
     return "Hello, World!"
 
+@app.route('/preview2')
+def preview_getimage2():
+    save_image_event.set()
+    save_complete_event.wait()
+    save_complete_event.clear()
+    # image_ready.seek(0)
+    img = io.BytesIO(image_buffer)
+    return send_file(img, mimetype='image/jpeg')
+
 @app.route('/preview')
 def preview_getimage():
     save_image_event.set()
@@ -67,7 +95,8 @@ def shutdown():
 
 if __name__ == '__main__':
     logging.info("main: is starting.")
-    t = threading.Thread(target=preview, daemon=True)
+    # t = threading.Thread(target=preview, daemon=True)
+    t = threading.Thread(target=preview2, daemon=True)
     t.start()
     app.run(host='0.0.0.0')
     logging.info("main: shutdown preview thread.")
