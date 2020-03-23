@@ -3,90 +3,41 @@ import sys
 import picamera
 import io
 import threading
-from flask import Flask, request, send_file, Response
+import time
+from fractions import Fraction
 
-app = Flask(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-PAGE="""\
-<html>
-<head>
-<title>picamera MJPEG streaming demo</title>
-</head>
-<body>
-<h1>PiCamera MJPEG Streaming Demo</h1>
-<img src="stream.mjpg" />
-</body>
-</html>
-"""
-# <img src="stream.mjpg" width="640" height="480" />
+def take_image():
+    logging.info("take_image: ++")
+    with picamera.PiCamera() as c:
+        c.resolution = (3280, 2464)
+        c.ISO = 50
+        c.capture("take_image_0.jpg")
+        analog_gain = c.analog_gain
+        iso = c.ISO
+        awb_gains = c.awb_gains
 
-image_frame=None
-quit_event = threading.Event()
-save_image_event = threading.Event()
-save_complete_event = threading.Event()
+    logging.info("take_image: --")
 
-def get_frame():
-    save_complete_event.clear()
-    save_image_event.set()
-    save_complete_event.wait()
-    logging.info("frame: gen.")
-    return image_frame
+def take_image_1():
+    logging.info("take_image_1: ++")
+    with picamera.PiCamera() as c:
+        c.resolution = (3280, 2464)
+        c.ISO = 100
+        c.awb_mode = 'off'
+        c.exposure_mode = 'off'
+        c.exposure_compensation = 0
+        # c.exposure_speed = 33243
+        # c.analog_gain = Fraction(737, 256)
+        # c.digital_gain = Fraction(257, 256)
+        c.shutter_speed = 75000
+        c.awb_gains = (Fraction(155, 128), Fraction(367, 128))
+        time.sleep(0.05)
+        c.capture("take_image_1.jpg")
+    logging.info("take_image_1: --")
 
-def capture_image():
-    global image_frame
-    with picamera.PiCamera() as camera:
-        stream = io.BytesIO()
-        for foo in camera.capture_continuous(stream, format='jpeg', use_video_port=True):
-            # with open("foo.jpg", "wb") as f:
-            #     f.write(stream.getvalue())
-            # break
-            if quit_event.is_set():
-                break
-            if save_image_event.is_set():
-                image_frame = stream.getvalue()
-                save_complete_event.set()
-                save_image_event.clear()
-            stream.seek(0)
-            stream.truncate()
-
-@app.route('/')
-def index():
-    return PAGE
-
-@app.route('/shutdown')
-def shutdown():
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func is None:
-        raise RuntimeError('Not running with the Werkzeug Server')
-    func()
-    logging.info("main: is terminating...")
-    return 'Server shutting down...'
-
-def gen():
-    while True:
-        frame = get_frame()
-        m = io.BytesIO()
-        m.write(b'--frame\r\n')
-        m.write(b'Content-Type: image/jpeg\r\n')
-        s = "Content-Length: %d\r\n\r\n" % len(frame)
-        m.write(s.encode('utf-8'))
-        m.write(frame)
-        m.write(b'\r\n')
-        yield (m.getvalue())
-        # yield (b'--frame\r\n'
-        #        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-@app.route('/stream.mjpg')
-def preview():
-    return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
-    
-
-if __name__ == '__main__':
-    logging.info("start: ++")
-    t = threading.Thread(target=capture_image, daemon=True)
-    t.start()
-    app.run(host="0.0.0.0")
-    quit_event.set()
-    t.join()
-    logging.info("start: --")
+logging.info("start: ++")
+take_image()
+take_image_1() 
+logging.info("start: --")
