@@ -272,9 +272,9 @@ namespace AndroidCleaner
                         android_env[k] = v;
                     }
                 }
+                ret = 8;
                 foreach (KeyValuePair<string, string> kvp in android_env)
                 {
-                    ret = 8;
                     if (target_value.Contains(kvp.Key))
                     {
                         logIt($"Start erasing path: {kvp.Key}={kvp.Value}");
@@ -293,12 +293,12 @@ namespace AndroidCleaner
                         foreach (string r in res.Item2)
                         {
                             logIt($"clean_sdcard: rm file: {r}");
-                            runExe_v2(adb, $"-s {sn} shell rm -f {r}", out exit_code);
+                            runExe_v2(adb, $"-s {sn} shell rm -f '{r}'", out exit_code);
                         }
                         foreach (string r in res.Item1)
                         {
                             logIt($"clean_sdcard: rm folder: {r}");
-                            runExe_v2(adb, $"-s {sn} shell rm -Rf {r}", out exit_code);
+                            runExe_v2(adb, $"-s {sn} shell rm -Rf '{r}'", out exit_code);
                         }
                         ret = 0;
                     }
